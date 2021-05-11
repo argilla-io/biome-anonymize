@@ -1,2 +1,2 @@
-# biome-anonimize
-Anonimizer module for biome pipelines
+# biome-anonymize
+Anonymizer module for biome pipelines
