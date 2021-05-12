@@ -17,77 +17,96 @@ class Anonymizer:
     Anonymizes a text using presidio https://microsoft.github.io/presidio/api/
     """
 
-    def __init__(self):
-        pass
-    
-    def get_default_entities(self, language="es"):
+    def __init__(self, language="es", model_name="es_core_news_sm", default_entities=None):
         """
         language
             Supported language ("en", "es", "nl", etc)
+        model_name
+            Spacy model name
+        default_entities
+            A list with the name of the default supported entities. If None, all the available for "language" are used.
         """
-        registry = RecognizerRegistry()
-        registry.load_predefined_recognizers(languages=[language])
-        entities=[]
-        for recognizer in registry.recognizers:
-            for entity in recognizer.get_supported_entities():
-                entities.append(entity)
-        return entities
+        self.language = language
+        self.model_name = model_name
+        self.nlp_engine = None
+        self.registry = None
+        self.entities = []
+        self.anonymizers_config = {}
+        self.analyzer = None
+        self. anonymizer = None
+        
+        # Create configuration containing engine name and models
+        configuration = {
+            "nlp_engine_name": "spacy",
+            "models": [{"lang_code": self.language, "model_name": self.model_name}]
+        }
+
+        # Create NLP engine based on configuration
+        provider = NlpEngineProvider(nlp_configuration=configuration)
+        self.nlp_engine = provider.create_engine()
+
+        # Prepare base entities
+        self.registry = RecognizerRegistry()
+        if not default_entities:
+            self.registry.load_predefined_recognizers(languages=[self.language])
+        
+        # Anonymizers mapping values
+        for entity in self.entities:
+            self.anonymizers_config[entity] = AnonymizerConfig("replace", {"new_value": entity})
     
-    def get_default_recognizers(self, language="es"):
+    def get_entities(self):
         """
-        language
-            Supported language ("en", "es", "nl", etc)
         """
-        registry = RecognizerRegistry()
-        registry.load_predefined_recognizers(languages=[language])
-        return registry.recognizers
+        return self.entities
     
-    def recognizer_regex(self, regex, name, language):
+    def add_recognizer_regex(self, regex, name):
         """
         regex
             Regex to match in the text
         name
             Name assigned to the recognizer
-        language
-            Supported language ("en", "es", "nl", etc)
         """
         pattern = Pattern(name=name, regex=regex, score=1)
         recognizer = PatternRecognizer(supported_entity=name,
-                                       patterns=[pattern], supported_language=language)
-        return recognizer
+                                       patterns=[pattern], supported_language=self.language)
+        self.registry.add_recognizer(recognizer)
+        self.entities.append(name)
+        
+        return None
     
-    def recognizer_deny_list(self, deny_list, name, language):
+    def add_recognizer_deny_list(self, deny_list, name):
         """
         deny_list
             List of tokens to match in the text
         name
             Name assigned to the recognizer
-        language
-            Supported language ("en", "es", "nl", etc)
         """
         regex = r"(?<= )(" + "|".join(deny_list) + r")(?=[ ,;.:!?)_-]+|$)" # Improve?
         pattern = Pattern(name=name, regex=regex, score=1)
         recognizer = PatternRecognizer(supported_entity=name,
-                                       patterns=[pattern], supported_language=language)
-        return recognizer
+                                       patterns=[pattern], supported_language=self.language)
+        self.registry.add_recognizer(recognizer)
+        self.entities.append(name)
+        
+        return None
     
-    def anonymize_dataset(cls, dataset, column="text", language="es", model_name="es_core_news_sm", recognizers=[], save_path=None,
-        entities=[], preprocess=lambda x: x):
+    def compile_anonymizer(self):
+        """
+        Prepares the analyzer and anonymizer
+        """
+        # Prepare analyzer
+        self.analyzer = AnalyzerEngine(registry=self.registry, nlp_engine=self.nlp_engine, supported_languages=[self.language])
+        # Prepare anonymizer
+        self.anonymizer = AnonymizerEngine()
+    
+    def anonymize_dataset(self, dataset, column="text", save_path=None, preprocess=lambda x: x):
         """
         Parameters
         ----------
         dataset
             The dataset to anonymize.
-        language
-            Text language
-        model_name
-            Spacy model name
         column
             Name of the column to anonymize.
-        recognizers
-            List of custom recognizers added to the default ones
-        entities
-            Supported entities to anonymize. https://microsoft.github.io/presidio/supported_entities/
         preprocess
             Optional function with only one parameter (string) that returns another string.
             This function will NOT modify the output text.
@@ -106,46 +125,6 @@ class Anonymizer:
         if column not in dataset.columns:
             raise KeyError("Column '{}' not in dataset".format(column))
 
-        # Create configuration containing engine name and models
-        configuration = {
-            "nlp_engine_name": "spacy",
-            "models": [{"lang_code": language, "model_name": model_name}]
-        }
-
-        # Create NLP engine based on configuration
-        provider = NlpEngineProvider(nlp_configuration=configuration)
-        nlp_engine = provider.create_engine()
-
-        #Prepare base entities
-        registry = RecognizerRegistry()
-        if recognizers == []:
-            registry.load_predefined_recognizers(languages=[language])
-
-        # Add custom recognizers
-        for recognizer in recognizers:
-            registry.add_recognizer(recognizer)
-        registry.recognizers = list(set(registry.recognizers))
-
-        # Prepare analyzer
-        analyzer = AnalyzerEngine(registry=registry, nlp_engine=nlp_engine, supported_languages=[language])
-
-        # Prepare anonymizer
-        anonymizer = AnonymizerEngine()
-
-        # Analyzer entities
-        if entities == []:
-            entities = cls.get_default_entities(language)
-            if recognizers != []:
-                for recognizer in recognizers:
-                    for entity in recognizer.get_supported_entities():
-                        entities.append(entity)
-        entities = list(set(entities))
-
-        # Anonymizer mapping values
-        anonymizers_config={}
-        for entity in entities:
-            anonymizers_config[entity] = AnonymizerConfig("replace", {"new_value": entity})
-
         # Preprocess in case there are NaNs
         dataset.dropna(how="all", axis=0, inplace=True)
         dataset.dropna(how="all", axis=1, inplace=True)
@@ -154,36 +133,27 @@ class Anonymizer:
         # Anonymize dataset
         dataset_PII = dataset.copy()
         dataset_PII[column] = dataset_PII[column].astype("str").apply(
-            lambda x: anonymizer.anonymize(
+            lambda x: self.anonymizer.anonymize(
                 text=x,
-                analyzer_results=analyzer.analyze(preprocess(x),language=language,entities=entities),
-                anonymizers_config=anonymizers_config
+                analyzer_results=self.analyzer.analyze(preprocess(x),language=self.language, entities=self.entities),
+                anonymizers_config=self.anonymizers_config
             )
         )
 
         # Whether or not the row was modified during anonymization
-        dataset_PII["has_PII"]=dataset_PII[column].apply(lambda x: any([value in x for value in entities]))
+        dataset_PII["has_PII"]=dataset_PII[column].apply(lambda x: any([value in x for value in self.entities]))
 
         if save_path:
             dataset_PII.to_csv(save_path)
 
         return dataset_PII
 
-    def anonymize_text(cls, text, language="es", model_name="es_core_news_sm", recognizers=[],
-                       entities=[], preprocess=lambda x: x):
+    def anonymize_text(self, text, preprocess=lambda x: x):
         """
         Parameters
         ----------
         text
             The text to anonymize.
-        language
-            Text language ("en", "es", "nl", etc)
-        model_name
-            Spacy model name
-        recognizers
-            List of custom recognizers added to the default ones
-        entities
-            Supported entities to anonymize. https://microsoft.github.io/presidio/supported_entities/
         preprocess
             Optional function with only one parameter (string) that returns another string.
             This function will NOT modify the output text.
@@ -195,7 +165,11 @@ class Anonymizer:
         The anonymized text string
 
         """
-        df = pd.DataFrame(data=[text], columns=["text"])
-        df = cls.anonymize_dataset(df, column="text", language=language, model_name=model_name, recognizers=recognizers,
-                                   save_path=None, entities=[], preprocess=preprocess)
-        return df.iloc[0]["text"]
+        anonymized_text = self.anonymizer.anonymize(
+                text=text,
+                analyzer_results=self.analyzer.analyze(preprocess(text),language=self.language, entities=self.entities),
+                anonymizers_config=self.anonymizers_config
+        )
+        has_PII = any([value in anonymized_text for value in self.entities])
+        
+        return (anonymized_text, has_PII)
