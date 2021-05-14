@@ -12,21 +12,24 @@ from presidio_analyzer.pattern import Pattern
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import RecognizerResult, AnonymizerConfig
 
+
 class Anonymizer:
     """
     Anonymizes a text using presidio https://microsoft.github.io/presidio/api/
     """
 
-    def __init__(self, language="es", model_name="es_core_news_sm", default_entities=None):
+    def __init__(self, model_name="es_core_news_sm", language=None, default_entities=None):
         """
-        language
-            Supported language ("en", "es", "nl", etc)
+        Parameters
+        ----------
         model_name
             Spacy model name
+        language
+            Supported language ("en", "es", "nl", etc)
         default_entities
             A list with the name of the default supported entities. If None, all the available for "language" are used.
         """
-        self.language = language
+        self.language = model_name[:model_name.index("_")] if not language else language
         self.model_name = model_name
         self.nlp_engine = None
         self.registry = None
@@ -53,14 +56,24 @@ class Anonymizer:
         # Anonymizers mapping values
         for entity in self.entities:
             self.anonymizers_config[entity] = AnonymizerConfig("replace", {"new_value": entity})
+            
+        # Prepare analyzer
+        self.analyzer = AnalyzerEngine(registry=self.registry, nlp_engine=self.nlp_engine, supported_languages=[self.language])
+        # Prepare anonymizer
+        self.anonymizer = AnonymizerEngine()
     
     def get_entities(self):
         """
+        Returns
+        -------
+        List of entities used
         """
         return self.entities
     
     def add_recognizer_regex(self, regex, name):
         """
+        Parameters
+        ----------
         regex
             Regex to match in the text
         name
@@ -75,7 +88,10 @@ class Anonymizer:
         return None
     
     def add_recognizer_deny_list(self, deny_list, name):
+        
         """
+        Parameters
+        ----------
         deny_list
             List of tokens to match in the text
         name
@@ -89,15 +105,6 @@ class Anonymizer:
         self.entities.append(name)
         
         return None
-    
-    def compile_anonymizer(self):
-        """
-        Prepares the analyzer and anonymizer
-        """
-        # Prepare analyzer
-        self.analyzer = AnalyzerEngine(registry=self.registry, nlp_engine=self.nlp_engine, supported_languages=[self.language])
-        # Prepare anonymizer
-        self.anonymizer = AnonymizerEngine()
     
     def anonymize_dataset(self, dataset, column="text", save_path=None, preprocess=lambda x: x):
         """
