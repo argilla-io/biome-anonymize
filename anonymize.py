@@ -61,7 +61,7 @@ class Anonymizer:
         self.analyzer = AnalyzerEngine(registry=self.registry, nlp_engine=self.nlp_engine, supported_languages=[self.language])
         # Prepare anonymizer
         self.anonymizer = AnonymizerEngine()
-    
+
     def get_entities(self):
         """
         Returns
@@ -88,6 +88,7 @@ class Anonymizer:
         return None
     
     def add_recognizer_deny_list(self, deny_list, name):
+
         """
         Parameters
         ----------
@@ -104,7 +105,7 @@ class Anonymizer:
         self.entities.append(name)
 
         return None
-    
+
     def anonymize_dataset(self, dataset, column="text", save_path=None, preprocess=lambda x: x):
         """
         Parameters
