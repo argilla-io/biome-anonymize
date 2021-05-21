@@ -1,11 +1,4 @@
-import os
 import pandas as pd
-import numpy as np
-import spacy
-import xlrd
-import re
-import unidecode
-import unicodedata
 from presidio_analyzer import AnalyzerEngine, RecognizerRegistry, PatternRecognizer
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_analyzer.pattern import Pattern
