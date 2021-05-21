@@ -1,11 +1,4 @@
-import os
 import pandas as pd
-import numpy as np
-import spacy
-import xlrd
-import re
-import unidecode
-import unicodedata
 from presidio_analyzer import AnalyzerEngine, RecognizerRegistry, PatternRecognizer
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_analyzer.pattern import Pattern
@@ -37,7 +30,7 @@ class Anonymizer:
         self.anonymizers_config = {}
         self.analyzer = None
         self. anonymizer = None
-        
+
         # Create configuration containing engine name and models
         configuration = {
             "nlp_engine_name": "spacy",
@@ -52,16 +45,16 @@ class Anonymizer:
         self.registry = RecognizerRegistry()
         if not default_entities:
             self.registry.load_predefined_recognizers(languages=[self.language])
-        
+
         # Anonymizers mapping values
         for entity in self.entities:
             self.anonymizers_config[entity] = AnonymizerConfig("replace", {"new_value": entity})
-            
+
         # Prepare analyzer
         self.analyzer = AnalyzerEngine(registry=self.registry, nlp_engine=self.nlp_engine, supported_languages=[self.language])
         # Prepare anonymizer
         self.anonymizer = AnonymizerEngine()
-    
+
     def get_entities(self):
         """
         Returns
@@ -84,11 +77,11 @@ class Anonymizer:
                                        patterns=[pattern], supported_language=self.language)
         self.registry.add_recognizer(recognizer)
         self.entities.append(name)
-        
+
         return None
     
     def add_recognizer_deny_list(self, deny_list, name):
-        
+
         """
         Parameters
         ----------
@@ -103,9 +96,9 @@ class Anonymizer:
                                        patterns=[pattern], supported_language=self.language)
         self.registry.add_recognizer(recognizer)
         self.entities.append(name)
-        
+
         return None
-    
+
     def anonymize_dataset(self, dataset, column="text", save_path=None, preprocess=lambda x: x):
         """
         Parameters
@@ -178,5 +171,5 @@ class Anonymizer:
                 anonymizers_config=self.anonymizers_config
         )
         has_PII = any([value in anonymized_text for value in self.entities])
-        
+
         return (anonymized_text, has_PII)
