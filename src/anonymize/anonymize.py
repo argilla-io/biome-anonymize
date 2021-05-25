@@ -16,11 +16,11 @@ class Anonymizer:
         Parameters
         ----------
         model_name
-            Spacy model name
+            Spacy model name.
         language
             Supported language ("en", "es", "nl", etc)
         default_entities
-            A list with the name of the default supported entities. If None, all the available for "language" are used.
+            A list with the name of the default supported entities.
         """
         self.language = model_name[:model_name.index("_")] if not language else language
         self.model_name = model_name
@@ -43,8 +43,9 @@ class Anonymizer:
 
         # Prepare base entities
         self.registry = RecognizerRegistry()
-        if not default_entities:
+        if default_entities:
             self.registry.load_predefined_recognizers(languages=[self.language])
+            self.entities = default_entities
 
         # Anonymizers mapping values
         for entity in self.entities:
