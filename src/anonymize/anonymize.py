@@ -92,7 +92,7 @@ class Anonymizer:
         name
             Name assigned to the recognizer
         """
-        regex = r"(?<= )(" + "|".join(deny_list) + r")(?=[ ,;.:!?)_-]+|$)" # Improve?
+        regex = r"(?<= )(" + "|".join(deny_list) + r")(?=[^a-zA-Z]+|$)" # Improve?
         pattern = Pattern(name=name, regex=regex, score=1)
         recognizer = PatternRecognizer(supported_entity=name,
                                        patterns=[pattern], supported_language=self.language)
