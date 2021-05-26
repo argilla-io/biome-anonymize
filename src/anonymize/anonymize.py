@@ -3,7 +3,7 @@ from presidio_analyzer import AnalyzerEngine, RecognizerRegistry, PatternRecogni
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_analyzer.pattern import Pattern
 from presidio_anonymizer import AnonymizerEngine
-from presidio_anonymizer.entities import RecognizerResult, AnonymizerConfig
+from presidio_anonymizer.entities.engine import RecognizerResult, OperatorConfig
 
 
 class Anonymizer:
@@ -49,7 +49,7 @@ class Anonymizer:
 
         # Anonymizers mapping values
         for entity in self.entities:
-            self.anonymizers_config[entity] = AnonymizerConfig("replace", {"new_value": entity})
+            self.anonymizers_config[entity] = OperatorConfig("replace", {"new_value": entity})
 
         # Prepare analyzer
         self.analyzer = AnalyzerEngine(registry=self.registry, nlp_engine=self.nlp_engine, supported_languages=[self.language])
@@ -78,6 +78,7 @@ class Anonymizer:
                                        patterns=[pattern], supported_language=self.language)
         self.registry.add_recognizer(recognizer)
         self.entities.append(name)
+        self.anonymizers_config[name] = OperatorConfig("replace", {"new_value": name})
 
         return None
     
@@ -97,6 +98,7 @@ class Anonymizer:
                                        patterns=[pattern], supported_language=self.language)
         self.registry.add_recognizer(recognizer)
         self.entities.append(name)
+        self.anonymizers_config[name] = OperatorConfig("replace", {"new_value": name})
 
         return None
 
@@ -137,8 +139,8 @@ class Anonymizer:
             lambda x: self.anonymizer.anonymize(
                 text=x,
                 analyzer_results=self.analyzer.analyze(preprocess(x),language=self.language, entities=self.entities),
-                anonymizers_config=self.anonymizers_config
-            )
+                operators=self.anonymizers_config
+            ).text
         )
 
         # Whether or not the row was modified during anonymization
@@ -169,8 +171,8 @@ class Anonymizer:
         anonymized_text = self.anonymizer.anonymize(
                 text=text,
                 analyzer_results=self.analyzer.analyze(preprocess(text),language=self.language, entities=self.entities),
-                anonymizers_config=self.anonymizers_config
-        )
+                operators=self.anonymizers_config
+        ).text
         has_PII = any([value in anonymized_text for value in self.entities])
 
         return (anonymized_text, has_PII)
