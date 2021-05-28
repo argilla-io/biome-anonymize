@@ -11,7 +11,7 @@ class Anonymizer:
     Anonymizes a text using presidio https://microsoft.github.io/presidio/api/
     """
 
-    def __init__(self, model_name="es_core_news_sm", language=None, default_entities=None):
+    def __init__(self, model_name="es_core_news_md", language=None, default_entities=None):
         """
         Parameters
         ----------
